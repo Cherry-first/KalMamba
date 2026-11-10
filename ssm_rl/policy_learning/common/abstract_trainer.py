@@ -42,11 +42,13 @@ class AbstractTrainer:
 
     def update_model_parameters(self,
                                 model_loss: torch.Tensor,
-                                retain_graph: bool = False):
+                                retain_graph: bool = False) -> Optional[torch.Tensor]:
+        """Returns the gradient norm before clipping, or None without clipping."""
         self._model_optimizer.zero_grad()
         model_loss.backward(retain_graph=retain_graph)
-        self._model_clip_fn()
+        grad_norm = self._model_clip_fn()
         self._model_optimizer.step()
+        return grad_norm
 
     @staticmethod
     def _build_optimizer_and_clipping(params,
@@ -56,7 +58,7 @@ class AbstractTrainer:
                                       weight_decay: float) -> tuple[opt.Optimizer, callable]:
         def clip_grads_if_desired(p):
             if clip_norm > 0:
-                _ = nn.utils.clip_grad_norm_(p, clip_norm)
+                return nn.utils.clip_grad_norm_(p, clip_norm)
         if weight_decay > 0.0:
             optimizer = opt.AdamW(params, lr=learning_rate, eps=adam_eps, weight_decay=weight_decay)
         else:

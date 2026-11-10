@@ -36,6 +36,19 @@ class CV2ImgResizeWrapper(gym.ObservationWrapper):
         return spaces.Tuple(obs_spaces)
 
 
+class ObsNoiseWrapper(gym.ObservationWrapper):
+    """Adds white Gaussian noise to the low-dimensional observations (KalMamba paper, Section 5.2)."""
+
+    def __init__(self, env, noise_std: float, seed: int):
+        super().__init__(env)
+        self._noise_std = noise_std
+        self._random = np.random.RandomState(seed)
+
+    def observation(self, observation):
+        return [o if is_image else o + self._noise_std * self._random.normal(size=o.shape)
+                for o, is_image in zip(observation, self.env.obs_are_images)]
+
+
 class RLEnvFactory:
 
     OBS_TYPES = {"img": envs.ObsTypes.IMAGE,
@@ -78,6 +91,11 @@ class RLEnvFactory:
 
         config.distractor_type = "none"
         config.distractor_location = "foreground"
+
+        # Noise for the KalMamba noisy-state experiments. The transition noise is added to the action inside
+        # the environment, so neither the model nor the policy sees it.
+        config.transition_noise_std = 0.0
+        config.obs_noise_std = 0.0
 
         if finalize_adding:
             config.finalize_adding()
@@ -133,7 +151,7 @@ class RLEnvFactory:
                         seed=seed,
                         obs_type=self.OBS_TYPES[self.obs_type],
                         action_repeat=config.action_repeat,
-                        transition_noise_std=0.0,
+                        transition_noise_std=config.transition_noise_std,
                         transition_noise_type="white",
                         distraction_type=distactor_types[config.distractor_type],
                         distraction_location=distractor_location[config.distractor_location],
@@ -144,6 +162,8 @@ class RLEnvFactory:
                         old_gym_return_type=False)
         if internal_img_size is not None:
             env = CV2ImgResizeWrapper(env, config.img_size)
+        if config.obs_noise_std > 0:
+            env = ObsNoiseWrapper(env, noise_std=config.obs_noise_std, seed=seed)
 
         env = TorchEnvWrapper(env, dtype)
         return env

@@ -1,0 +1,145 @@
+# Standard image-based DMC tasks (KalMamba paper Section 5.1, Figures 3, 7 and 8): 64x64 RGB images, no
+# added noise. Everything not listed here is inherited from noisy_state.yml (same sources and assumptions,
+# e.g. action repeat 2 and 250 updates per episode for every task, sequence length 32, batch 32).
+# Sources as in noisy_state.yml: "T2"/"T3" = paper Tables 2/3, "CoRAL" = pbecker93/CoRAL image configs.
+#   sbatch --time=48:00:00 scripts/isambard/train.sbatch experiments/configs/kalmamba/image.yml smoke_kalmamba
+# Experiments: kalmamba (the paper's model, alpha = 1 with Equation 2 summed over latent dimensions),
+# ablations no_mamba / no_mcd / no_reg (Figure 3 right, Figure 8), kalmamba_mean (Equation 2 averaged over
+# latent dimensions, our variant), vrkn, rssm. Per-task/seed runs: image_sweep.yml (make_sweep_configs.py).
+name: "DEFAULT"
+import_path: "noisy_state.yml"
+path: "experiments/outputs/image"
+params:
+  experiment:
+    obs_type: "img"              # S5.1: images only
+  env:
+    transition_noise_std: 0.0    # S5.1: standard tasks, the noise is only in S5.2
+    obs_noise_std: 0.0
+    img_size: 64                 # CoRAL / Dreamer; the paper does not say
+  policy:
+    actor:                       # T3, image based: 3 x 1024 ELU
+      num_layers: 3
+      layer_size: 1024
+      activation: "ELU"
+    critic:
+      num_layers: 3
+      layer_size: 1024
+      activation: "ELU"
+  trainer:
+    objective:
+      obs0:                      # T2 image decoder: ConvNet from [19, 22] with ReLU (CoRAL's Dreamer decoder)
+        conv_depth_factor: 32
+        conv_activation: "ReLU"
+        output_std: 1.0
+  rl:
+    img_preprocessing:
+      type: "none"               # CoRAL default for reconstruction models: pixels / 255 - 0.5
+  model:
+    encoder0:                    # T2 image encoder: ConvNet from [19, 22] with ReLU (Dreamer encoder, 1024 out)
+      conv_depth_factor: 32
+      conv_activation: "ReLU"
+      add_dense_layer: False
+
+---
+name: "kalmamba"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+
+---
+# Our variant: Equation 2 averaged instead of summed over the 230 latent dimensions (see noisy_state.yml).
+name: "kalmamba_mean"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, regularization_reduction: "mean",
+                        kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+
+---
+# Ablation "No Mamba": no Mamba blocks, so m_t depends only on w_t and a_{t-1} (S5.1).
+name: "no_mamba"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  model: {transition: {num_blocks: 0}}
+
+---
+# Ablation "No Monte-Carlo Dropout" (S5.1).
+name: "no_mcd"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  model: {transition: {mc_drop_prob: 0.0}}
+
+---
+# Ablation "No Regularization" (S5.1); the same model as kalmamba_noreg in noisy_state.yml.
+name: "no_reg"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+
+---
+name: "vrkn"
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+
+---
+# RSSM+SAC: 30 stochastic + 200 deterministic units and KL balancing 0.8 (T2), Dreamer defaults otherwise.
+name: "rssm"
+params:
+  experiment: {world_model: "rssm"}
+  trainer: {objective: {kl: {alpha: 0.8}}}
+  model:
+    transition: {type: "r_rssm", lsd: 30, rec_state_dim: 200, num_layers: 1, layer_size: 200, min_std: 0.1,
+                 activation: "ELU"}
+
+---
+# Quick end-to-end checks (3 iterations, a few updates), not results.
+name: "smoke_kalmamba"
+iterations: 3
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}
+
+---
+name: "smoke_no_mamba"
+iterations: 3
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  model: {transition: {num_blocks: 0}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}
+
+---
+name: "smoke_vrkn"
+iterations: 3
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}
+
+---
+name: "smoke_rssm"
+iterations: 3
+params:
+  experiment: {world_model: "rssm"}
+  trainer: {objective: {kl: {alpha: 0.8}}}
+  model:
+    transition: {type: "r_rssm", lsd: 30, rec_state_dim: 200, num_layers: 1, layer_size: 200, min_std: 0.1,
+                 activation: "ELU"}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}
+
+---
+# 25 full-size iterations on walker-walk, to time an iteration before launching the sweep.
+name: "time_kalmamba"
+iterations: 25
+params:
+  env: {env: "walker-walk"}
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  policy_eval: {reward_eval: {eval_interval: 10, num_sequences: 5}}

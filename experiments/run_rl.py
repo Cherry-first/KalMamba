@@ -5,6 +5,8 @@ from ssm_rl.util.config_dict import ConfigDict
 from ssm_rl.rssm.rssm_factory import RSSMFactory
 
 import ssm_rl.rssm.objectives.objective_factory as rssm_of
+from ssm_rl.kalmamba.kalmamba_factory import (LinearGaussianSSMFactory, KalMambaTransitionFactory,
+                                              VRKNTransitionFactory, SmoothingSSMObjectiveFactory)
 from ssm_rl.mock_ssm.mock_factories import MockSSMFactory, MockSSMObjectiveFactory
 
 from ssm_rl.model_learning.objective_factories import SSLObjectiveFactory, ReconstructionObjectiveFactory
@@ -96,6 +98,13 @@ class Cw2MBRLExperiment(Cw2Experiment):
             model_factory = RSSMFactory(encoder_factories=encoder_factories)
             model_objective_factory = \
                 rssm_of.RSSMObjectiveFactory(observation_loss_factories=observation_loss_factories)
+        elif exp_config.world_model in ["kalmamba", "vrkn"]:
+            transition_factory = KalMambaTransitionFactory if exp_config.world_model == "kalmamba" \
+                else VRKNTransitionFactory
+            model_factory = LinearGaussianSSMFactory(encoder_factories=encoder_factories,
+                                                     transition_factory=transition_factory)
+            model_objective_factory = \
+                SmoothingSSMObjectiveFactory(observation_loss_factories=observation_loss_factories)
         elif exp_config.world_model == "none":
             model_factory = MockSSMFactory()
             model_objective_factory = MockSSMObjectiveFactory()

@@ -1,0 +1,82 @@
+---
+# Train/act mismatch check (ssm_rl/kalmamba/diagnostics.py) on noisy walker-run, seed 0. Training is the same
+# as the main runs; the diagnostic only reads the episode just collected. Run with KALMAMBA_DIAG_EVERY set:
+#   KALMAMBA_DIAG_EVERY=10 sbatch --export=ALL scripts/isambard/train.sbatch experiments/configs/kalmamba/train_act_diag.yml diag_kalmamba_mean
+name: "DEFAULT"
+import_path: "noisy_state.yml"
+path: "experiments/outputs/train_act_diag"
+iterations: 201
+params:
+  env: {env: "walker-run"}
+  trainer:
+    objective:
+      kl:
+        alpha: 0.5
+        initial_scale_factor: 0.0
+  policy_eval:
+    reward_eval:
+      eval_interval: 20
+      num_sequences: 10
+
+---
+name: "diag_kalmamba_mean"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, regularization_reduction: "mean"}}
+
+---
+name: "diag_kalmamba_sum"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, regularization_reduction: "sum"}}
+
+---
+name: "diag_vrkn"
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0}}
+
+---
+# Quick end-to-end check of the diagnostic.
+name: "smoke_diag_kalmamba"
+iterations: 2
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, regularization_reduction: "mean"}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 1}}
+
+---
+name: "smoke_diag_vrkn"
+iterations: 2
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 1}}
+
+---
+# Fix candidate (not in the paper): act on the filtered belief of the last 32 steps, computed with the
+# training-time parallel pass, so acting and SAC training see the same belief distribution.
+name: "win_kalmamba_mean"
+params:
+  experiment: {world_model: "kalmamba"}
+  model: {transition: {act_window: 32}}
+  trainer: {objective: {regularization_scale: 1.0, regularization_reduction: "mean"}}
+
+---
+name: "win_kalmamba_sum"
+params:
+  experiment: {world_model: "kalmamba"}
+  model: {transition: {act_window: 32}}
+  trainer: {objective: {regularization_scale: 1.0, regularization_reduction: "sum"}}
+
+---
+name: "smoke_win_kalmamba"
+iterations: 2
+params:
+  experiment: {world_model: "kalmamba"}
+  model: {transition: {act_window: 32}}
+  trainer: {objective: {regularization_scale: 1.0, regularization_reduction: "mean"}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 1}}

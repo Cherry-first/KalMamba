@@ -1,4 +1,11 @@
-experiments/outputs
+# Run outputs stay local; keep only the summary results and Slurm job lists.
+experiments/outputs/*
+!experiments/outputs/*_jobs.txt
+!experiments/outputs/noisy_state_results/
+!experiments/outputs/runtime/
+!experiments/outputs/fig5_seq_len/
+experiments/outputs/fig5_seq_len/*
+!experiments/outputs/fig5_seq_len/fig5.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -89,3 +96,6 @@ n_link_sim/forwardModels/DoubleLinkForwardModel_wrap.c
 n_link_sim/dist
 n_link_sim/build
 n_link_sim/N_Link_Simulator.egg-info
+
+# Slurm logs
+*-[0-9]*.out

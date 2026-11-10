@@ -3,6 +3,8 @@ from collections import OrderedDict
 from typing import Optional
 import numpy as np
 import random
+import os
+import time
 import warnings
 
 from ssm_rl.util.config_dict import ConfigDict
@@ -248,6 +250,7 @@ class RLExperiment:
                 self._policy_evaluators.append(evaluator)
             self._conf_save_dict["policy_eval"] = policy_eval_config
         self._built = True
+        self._start_time = time.time()  # wall-clock reference for time/elapsed_h (paper Figure 5)
         return self._conf_save_dict
 
     def iterate(self, iteration: int):
@@ -270,6 +273,7 @@ class RLExperiment:
                                               log_dict=log_dict)
             log_dict = self._eval_policy(iteration=iteration,
                                          log_dict=log_dict)
+            log_dict["time/elapsed_h"] = (time.time() - self._start_time) / 3600
             return log_dict
 
     def _eval_model(self,
@@ -332,6 +336,23 @@ class RLExperiment:
                                      terminated=terminated,
                                      truncated=truncated,
                                      infos=infos)
+        log_dict = self._train_act_diagnostic(iteration=iteration, log_dict=log_dict)
+        return log_dict
+
+    def _train_act_diagnostic(self, iteration: int, log_dict: OrderedDict) -> OrderedDict:
+        """Opt-in via KALMAMBA_DIAG_EVERY=N: compare acting-time and training-time beliefs on the episode just
+        collected (ssm_rl/kalmamba/diagnostics.py). Only for the linear Gaussian SSMs."""
+        every = int(os.environ.get("KALMAMBA_DIAG_EVERY", "0"))
+        tm = getattr(self._model, "transition_model", None)
+        if every <= 0 or iteration % every != 0 or not hasattr(tm, "_latent_obs_net"):
+            return log_dict
+        from ssm_rl.kalmamba.diagnostics import train_act_mismatch
+        episode = self._replay_buffer._all_data[-1]
+        results = train_act_mismatch(model=self._model, observations=episode["obs"], actions=episode["actions"],
+                                     window=self._rb_kwargs_train["seq_length"], device=self._device)
+        print(f"[diag] iteration {iteration}: " + " ".join(f"{k}={v}" for k, v in results.items()))
+        for k, v in results.items():
+            log_dict[f"diag/{k}"] = v
         return log_dict
 
     def save_replay_buffer(self, path: str):

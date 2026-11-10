@@ -1,0 +1,55 @@
+---
+# Short KalMamba runs to understand the Mahalanobis regularizer (Equation 2). In the first full run it rose
+# to ~28,000 and dominated the loss. Each variant changes one thing relative to "reg_base".
+#   sbatch scripts/isambard/train.sbatch experiments/configs/kalmamba/regularizer_study.yml reg_base
+name: "DEFAULT"
+import_path: "noisy_state.yml"
+path: "experiments/outputs/regularizer_study"
+iterations: 151                  # 150k env steps; the regularizer had blown up by iteration 100
+params:
+  experiment:
+    world_model: "kalmamba"
+  trainer:
+    objective:
+      regularization_scale: 1.0
+      kl:
+        alpha: 0.5
+        initial_scale_factor: 0.0
+  policy_eval:
+    reward_eval:
+      eval_interval: 10
+      num_sequences: 10
+
+---
+# Same settings as the first full run.
+name: "reg_base"
+
+---
+# Divide Equation 2 by the latent size instead of summing over it.
+name: "reg_mean"
+params:
+  trainer: {objective: {regularization_reduction: "mean"}}
+
+---
+# Let the regularizer also pull the filtered belief towards m_t.
+name: "reg_both_ways"
+params:
+  trainer: {objective: {regularization_detach_filter: False}}
+
+---
+# No Monte-Carlo dropout, so m_t and the filtered mean are not perturbed by dropout noise.
+name: "reg_no_mcd"
+params:
+  model: {transition: {mc_drop_prob: 0.0}}
+
+---
+# VRKN's gradient clipping (100) instead of CoRAL's (10), so the ELBO gradients are not clipped away.
+name: "reg_clip100"
+params:
+  trainer: {model_clip_norm: 100.0}
+
+---
+# No regularizer, the paper's "No Regularization" ablation.
+name: "reg_off"
+params:
+  trainer: {objective: {regularization_scale: 0.0}}

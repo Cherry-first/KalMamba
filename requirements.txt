@@ -1,0 +1,21 @@
+# Installed on top of torch 2.7.1, causal-conv1d and mamba-ssm (see Dockerfile).
+# The CoRAL and VRKN code was written for torch 1.13, numpy 1.23, dm_control 1.0.7 and mujoco 2.2.2,
+# which have no Arm64 wheels, so newer versions are used.
+numpy==1.26.4
+scipy==1.15.3
+dm_control==1.0.28
+mujoco==3.3.0  # the version dm_control 1.0.28 pins in its requirements.txt
+gym==0.26.2
+imageio==2.37.0
+imageio-ffmpeg==0.6.0
+pytest==8.3.5
+# mamba-ssm 2.2.4 imports GreedySearchDecoderOnlyOutput, which later transformers releases removed.
+transformers==4.46.3
+# CoRAL experiment runner and DMC code path; mani-skill2 is left out because only manipulation tasks need it.
+cw2==2.5.1
+pandas==2.2.3
+opencv-python-headless==4.10.0.84
+scikit-video==1.1.11
+matplotlib==3.9.4
+pyyaml==6.0.2
+pillow==11.0.0

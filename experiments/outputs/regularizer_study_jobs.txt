@@ -1,0 +1,6 @@
+reg_base 8173010
+reg_mean 8173011
+reg_both_ways 8173012
+reg_no_mcd 8173013
+reg_clip100 8173014
+reg_off 8173015

@@ -1,0 +1,114 @@
+---
+# Paper Figure 5: wall-clock training on noisy walker-walk for training sequence lengths 32/64/128/256,
+# 1M env steps or at most 24 hours, one GPU per run. Seed 0. Everything else as noisy_state.yml; the batch
+# keeps 32 sequences, so longer sequences mean more data per batch (the paper does not say).
+# KalMamba uses no regularizer, the best variant in our noisy-state runs (the paper used alpha = 1).
+#   sbatch --time=24:00:00 scripts/isambard/train.sbatch experiments/configs/kalmamba/fig5_seq_len.yml kalmamba_L64
+# Wall-clock time per iteration is logged as time/elapsed_h.
+name: "DEFAULT"
+import_path: "noisy_state.yml"
+path: "experiments/outputs/fig5_seq_len"
+params:
+  env: {env: "walker-walk"}
+
+---
+name: "kalmamba_L32"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 32}}
+
+---
+name: "vrkn_L32"
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 32}}
+
+---
+name: "rssm_L32"
+params:
+  experiment: {world_model: "rssm"}
+  trainer: {objective: {kl: {alpha: 0.8}}}
+  model: {transition: {type: "r_rssm", lsd: 30, rec_state_dim: 200, num_layers: 1, layer_size: 200,
+                       min_std: 0.1, activation: "ELU"}}
+  rl: {rl_exp: {model_updt_seq_length: 32}}
+
+---
+name: "kalmamba_L64"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 64}}
+
+---
+name: "vrkn_L64"
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 64}}
+
+---
+name: "rssm_L64"
+params:
+  experiment: {world_model: "rssm"}
+  trainer: {objective: {kl: {alpha: 0.8}}}
+  model: {transition: {type: "r_rssm", lsd: 30, rec_state_dim: 200, num_layers: 1, layer_size: 200,
+                       min_std: 0.1, activation: "ELU"}}
+  rl: {rl_exp: {model_updt_seq_length: 64}}
+
+---
+name: "kalmamba_L128"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 128}}
+
+---
+name: "vrkn_L128"
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 128}}
+
+---
+name: "rssm_L128"
+params:
+  experiment: {world_model: "rssm"}
+  trainer: {objective: {kl: {alpha: 0.8}}}
+  model: {transition: {type: "r_rssm", lsd: 30, rec_state_dim: 200, num_layers: 1, layer_size: 200,
+                       min_std: 0.1, activation: "ELU"}}
+  rl: {rl_exp: {model_updt_seq_length: 128}}
+
+---
+name: "kalmamba_L256"
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 256}}
+
+---
+name: "vrkn_L256"
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 256}}
+
+---
+name: "rssm_L256"
+params:
+  experiment: {world_model: "rssm"}
+  trainer: {objective: {kl: {alpha: 0.8}}}
+  model: {transition: {type: "r_rssm", lsd: 30, rec_state_dim: 200, num_layers: 1, layer_size: 200,
+                       min_std: 0.1, activation: "ELU"}}
+  rl: {rl_exp: {model_updt_seq_length: 256}}
+
+---
+# Quick end-to-end check at the longest length.
+name: "smoke_L256"
+iterations: 2
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_seq_length: 256, model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 1}}

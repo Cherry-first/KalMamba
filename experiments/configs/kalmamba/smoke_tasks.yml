@@ -1,0 +1,23 @@
+---
+# 3-iteration KalMamba runs on each task, to check the environments before the full sweep. Not results.
+name: "DEFAULT"
+import_path: "noisy_state.yml"
+path: "experiments/outputs/smoke_tasks"
+iterations: 3
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}
+
+---
+name: "cartpole-swingup"
+params: {env: {env: "cartpole-swingup"}}
+
+---
+name: "quadruped-walk"
+params: {env: {env: "quadruped-walk"}}
+
+---
+name: "walker-run"
+params: {env: {env: "walker-run"}}

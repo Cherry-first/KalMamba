@@ -1,0 +1,203 @@
+---
+# State-based DMC tasks with observation and dynamics noise (KalMamba paper Section 5.2, Figures 4 and 9).
+# Sources: "T2"/"T3" = Tables 2/3 of the paper, "S5" = Section 5, "A1" = Appendix A.1, "CoRAL" =
+# pbecker93/CoRAL configs, "VRKN" = pbecker93/vrkn defaults, "Dreamer" = Hafner et al. 2020 defaults,
+# "assumed" = not stated anywhere.
+#   sbatch scripts/isambard/train.sbatch experiments/configs/kalmamba/noisy_state.yml kalmamba
+# Experiments: kalmamba, vrkn, rssm (and smoke_<name> for a 3-iteration check). Plain SAC is in
+# noisy_state_sac.yml because it has no world model settings.
+name: "DEFAULT"
+path: "experiments/outputs/noisy_state"
+repetitions: 1
+iterations: 1001                 # 1 episode (1000 env steps) per iteration -> 1M env steps (S5)
+reps_per_job: 1
+reps_in_parallel: 1
+params:
+  experiment:
+    obs_type: "state"
+    model_objective: "vi"
+    agent: "sac"
+    seed: 0
+  env:
+    env: "walker-walk"
+    action_repeat: 2             # CoRAL locomotion config; assumed for all tasks
+    transition_noise_std: 0.3    # S5.2, added to the action inside the environment
+    obs_noise_std: 0.3           # S5.2, read as a standard deviation (assumed)
+  policy:
+    use_det_features: True       # actor and critic see the filtered mean (S4.3)
+    project_for_bypass: False
+    actor:                       # T3, low-dimensional
+      num_layers: 2
+      layer_size: 256
+      activation: "ReLU"
+      min_std: 0.005             # CoRAL
+      init_std: 0.01831563888873418
+      mean_scale: 5.0
+      apply_mean_scale: True
+    critic:
+      num_layers: 2
+      layer_size: 256
+      activation: "ReLU"
+  trainer:
+    discount: 0.99               # T3
+    target_critic_decay: 0.995   # T3: update fraction 0.005
+    target_critic_interval: 1
+    critic_grad_to_model: False  # world model and SAC are trained independently (S4.3)
+    actor_learning_rate: 0.0003  # T3
+    actor_clip_norm: 10          # CoRAL
+    critic_learning_rate: 0.0003 # T3
+    critic_clip_norm: 100.0      # CoRAL
+    model_learning_rate: 0.0003  # T2
+    model_clip_norm: 10          # CoRAL
+    entropy:
+      learning_rate: 0.0003      # T3
+      clip_norm: 1.0             # CoRAL
+      learn_bonus: True
+      bonus: 0.1                 # T3 "initial learning rate 0.1", read as the initial temperature
+      target: "auto"             # T3: -dim(action)
+    objective:
+      kl:
+        free_nats: 3.0           # T2
+        balanced: True
+      obs0:
+        num_layers: 2            # T2 decoder: 2 x 256 ELU
+        layer_size: 256
+        dense_activation: "ELU"
+        output_std: 1.0          # fixed standard deviation (S4.1); value from CoRAL
+  rl:
+    initial_data_collection:
+      seq_length: -1
+      num_sequences: 5           # CoRAL
+    data_collection:
+      seq_length: -1
+      num_sequences: 1
+      action_noise_std: 0.0      # CoRAL
+    rl_exp:
+      normalize_obs: True
+      model_updt_seq_length: 32  # S5
+      model_updt_batch_size: 32  # CoRAL
+      model_updt_steps: 250      # CoRAL locomotion config: one update per two policy steps
+  model:
+    encoder0:                    # T2 encoder: 2 x 256 ELU
+      num_layers: 2
+      layer_size: 256
+      dense_activation: "ELU"
+    reward_decoder:              # T2: 2 x 256 ELU
+      num_layers: 2
+      layer_size: 256
+      activation: "ELU"
+  policy_eval:
+    reward_eval:
+      eval_interval: 20          # S5: 20 evaluation runs every 20,000 env steps
+      num_sequences: 20
+      use_mean: True
+      record_vid: False
+      max_sequence_length: -1
+
+---
+name: "kalmamba"
+params:
+  experiment:
+    world_model: "kalmamba"
+  trainer:
+    objective:
+      regularization_scale: 1.0  # T2 alpha
+      kl:
+        alpha: 0.5               # T2 KL balancing
+        initial_scale_factor: 0.0  # VRKN
+
+---
+# KalMamba with Equation 2 averaged over the latent dimensions instead of summed. With the sum, the
+# regularizer's gradient norm reached 1e4 against a clip norm of 10, so the ELBO barely trained and KalMamba
+# trailed both baselines on 3 of 4 tasks (seed-0 sweep, 2026-11-08).
+name: "kalmamba_mean"
+params:
+  experiment:
+    world_model: "kalmamba"
+  trainer:
+    objective:
+      regularization_scale: 1.0
+      regularization_reduction: "mean"
+      kl:
+        alpha: 0.5
+        initial_scale_factor: 0.0
+
+---
+# KalMamba without the Mahalanobis regularizer (the paper's "No Regularization" ablation, Fig. 8, which the
+# paper only runs on images). On noisy walker-walk this had the best early return and reconstruction in the
+# 150-iteration regularizer study.
+name: "kalmamba_noreg"
+params:
+  experiment:
+    world_model: "kalmamba"
+  trainer:
+    objective:
+      regularization_scale: 0.0
+      kl:
+        alpha: 0.5
+        initial_scale_factor: 0.0
+
+---
+# VRKN+SAC: same settings as KalMamba where they apply (A1); VRKN defaults for the transition model.
+name: "vrkn"
+params:
+  experiment:
+    world_model: "vrkn"
+  trainer:
+    objective:
+      regularization_scale: 0.0  # the VRKN has no m_t to regularize
+      kl:
+        alpha: 0.5               # T2
+        initial_scale_factor: 0.0  # VRKN
+
+---
+# RSSM+SAC: 30 stochastic + 200 deterministic units and KL balancing 0.8 (T2), Dreamer defaults otherwise (A1).
+name: "rssm"
+params:
+  experiment:
+    world_model: "rssm"
+  trainer:
+    objective:
+      kl:
+        alpha: 0.8               # T2
+  model:
+    transition:
+      type: "r_rssm"
+      lsd: 30                    # T2
+      rec_state_dim: 200         # T2
+      num_layers: 1              # Dreamer
+      layer_size: 200            # Dreamer
+      min_std: 0.1               # Dreamer
+      activation: "ELU"          # Dreamer
+
+---
+# Quick end-to-end check of the training loop, not a result.
+name: "smoke_kalmamba"
+iterations: 3
+params:
+  experiment: {world_model: "kalmamba"}
+  trainer: {objective: {regularization_scale: 1.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}
+
+---
+# Quick end-to-end check of the training loop, not a result.
+name: "smoke_vrkn"
+iterations: 3
+params:
+  experiment: {world_model: "vrkn"}
+  trainer: {objective: {regularization_scale: 0.0, kl: {alpha: 0.5, initial_scale_factor: 0.0}}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}
+
+---
+# Quick end-to-end check of the training loop, not a result.
+name: "smoke_rssm"
+iterations: 3
+params:
+  experiment: {world_model: "rssm"}
+  trainer: {objective: {kl: {alpha: 0.8}}}
+  model: {transition: {type: "r_rssm", lsd: 30, rec_state_dim: 200, num_layers: 1, layer_size: 200,
+                       min_std: 0.1, activation: "ELU"}}
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}

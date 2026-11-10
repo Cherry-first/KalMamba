@@ -1,0 +1,82 @@
+---
+# Plain SAC on the noisy state-based DMC tasks, without a world model (KalMamba paper Section 5.2, Figure 4).
+# Same environment, SAC hyperparameters and evaluation as noisy_state.yml; the data settings follow CoRAL's
+# plain_sac.yml. Source tags as in noisy_state.yml.
+#   sbatch scripts/isambard/train.sbatch experiments/configs/kalmamba/noisy_state_sac.yml sac
+name: "DEFAULT"
+path: "experiments/outputs/noisy_state"
+repetitions: 1
+iterations: 1001
+reps_per_job: 1
+reps_in_parallel: 1
+params:
+  experiment:
+    obs_type: "state"
+    world_model: "none"
+    model_objective: "none"
+    agent: "sac"
+    seed: 0
+  env:
+    env: "walker-walk"
+    action_repeat: 2             # as noisy_state.yml
+    transition_noise_std: 0.3    # S5.2
+    obs_noise_std: 0.3           # S5.2
+  policy:
+    project_for_bypass: False
+    actor:                       # T3, low-dimensional
+      num_layers: 2
+      layer_size: 256
+      activation: "ReLU"
+      min_std: 0.005             # CoRAL
+      init_std: 1.0              # CoRAL plain_sac
+      apply_mean_scale: False    # CoRAL plain_sac
+    critic:
+      num_layers: 2
+      layer_size: 256
+      activation: "ReLU"
+  trainer:
+    discount: 0.99               # T3
+    target_critic_decay: 0.995   # T3
+    target_critic_interval: 1
+    actor_learning_rate: 0.0003  # T3
+    actor_clip_norm: 10          # CoRAL
+    critic_learning_rate: 0.0003 # T3
+    critic_clip_norm: 100.0      # CoRAL
+    entropy:
+      learning_rate: 0.0003      # T3
+      clip_norm: 1.0             # CoRAL
+      learn_bonus: True
+      bonus: 0.1                 # T3
+      target: "auto"             # T3
+  rl:
+    initial_data_collection:
+      seq_length: -1
+      num_sequences: 10          # CoRAL plain_sac
+    data_collection:
+      seq_length: -1
+      num_sequences: 1
+      action_noise_std: 0.0
+    rl_exp:
+      bypass_mask: [True]        # the observation goes straight to actor and critic
+      normalize_obs: False       # CoRAL plain_sac
+      model_updt_seq_length: 2   # CoRAL plain_sac: single transitions
+      model_updt_batch_size: 256 # CoRAL plain_sac
+      model_updt_steps: 250      # same number of updates as the world-model agents (assumed)
+  policy_eval:
+    reward_eval:
+      eval_interval: 20          # S5
+      num_sequences: 20
+      use_mean: True
+      record_vid: False
+      max_sequence_length: -1
+
+---
+name: "sac"
+
+---
+# Quick end-to-end check of the training loop, not a result.
+name: "smoke_sac"
+iterations: 3
+params:
+  rl: {rl_exp: {model_updt_steps: 20}}
+  policy_eval: {reward_eval: {eval_interval: 1, num_sequences: 2}}

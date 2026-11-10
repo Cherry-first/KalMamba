@@ -2,7 +2,6 @@ from typing import Optional
 
 import envs.dmc.factory as dmc_factory
 from envs.dmc.dmc_mbrl_env import DMCMBRLEnv
-from envs.maniskill.maniskill_mbrl_env import ManiSkillMBRLEnv
 
 from envs.common.obs_types import ObsTypes
 
@@ -25,6 +24,8 @@ def _build_env(domain_name: str,
                image_to_info: bool = False,
                full_state_to_info: bool = False):
     if domain_name == "maniskill":
+        # Imported here so that DMC tasks do not need mani-skill2 installed.
+        from envs.maniskill.maniskill_mbrl_env import ManiSkillMBRLEnv
         env = ManiSkillMBRLEnv(task=task_name,
                                seed=seed,
                                obs_type=obs_type,

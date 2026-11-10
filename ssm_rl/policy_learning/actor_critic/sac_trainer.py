@@ -156,8 +156,10 @@ class SACPolicyTrainer(AbstractMaxEntropyPolicyTrainer):
             model_loss, model_obj_log_dict = self.model_objective.compute_losses(obs_for_model, *batch[1:])
             loss_dict = {"model/neg_elbo": model_loss.item()}
             model_obj_log_dict = loss_dict | {"model/{}".format(k): v for k, v in model_obj_log_dict.items()}
-            self.update_model_parameters(model_loss=model_loss,
-                                         retain_graph=not self._detach_states)
+            grad_norm = self.update_model_parameters(model_loss=model_loss,
+                                                     retain_graph=not self._detach_states)
+            if grad_norm is not None:
+                model_obj_log_dict["model/grad_norm"] = grad_norm.item()
 
         if self._detach_states:
             with torch.no_grad():

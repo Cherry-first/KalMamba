@@ -1,0 +1,630 @@
+<title>KalMamba 结构图解</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~44rem) with figures that widen to 60rem; module colors mark the four parts of the model everywhere (diagrams, table, text). */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --ink: #1a2130;
+  --ink-2: #435066;
+  --muted: #6a7486;
+  --line: #dce1e8;
+  --obs: #2a6fc9;      /* observation + encoder */
+  --mamba: #5b48c9;    /* Mamba dynamics path */
+  --kal: #11845b;      /* Kalman inference */
+  --pol: #b8610e;      /* policy (SAC) */
+  --reg: #c2416b;      /* regularizer */
+  --f-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10141b; --surface: #171c25; --ink: #e5e8ee; --ink-2: #b4bccb; --muted: #8b94a5; --line: #2a3242;
+    --obs: #6aa4f0; --mamba: #9d8ff2; --kal: #45c792; --pol: #eea256; --reg: #ef7fa3;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10141b; --surface: #171c25; --ink: #e5e8ee; --ink-2: #b4bccb; --muted: #8b94a5; --line: #2a3242;
+  --obs: #6aa4f0; --mamba: #9d8ff2; --kal: #45c792; --pol: #eea256; --reg: #ef7fa3;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 16px; line-height: 1.8;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 80px;
+}
+main { max-width: 44rem; margin: 0 auto; display: flex; flex-direction: column; gap: 3.2rem; }
+section { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.wide { width: min(60rem, 100vw - 32px); align-self: center; min-width: 0; }
+
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.35; }
+h1 { font-size: 2.2rem; letter-spacing: 0.01em; }
+h2 { font-size: 1.5rem; padding-top: 0.4rem; border-top: 1px solid var(--line); padding-top: 1.6rem; }
+h3 { font-size: 1.12rem; font-family: var(--f-body); font-weight: 700; }
+p, ul, ol, dl { margin: 0; }
+ul, ol { padding-left: 1.4rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.eyebrow { font-size: 0.78rem; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+.lead { font-size: 1.12rem; color: var(--ink-2); }
+.muted { color: var(--muted); }
+small, .small { font-size: 0.86rem; }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+sub, sup { font-size: 0.72em; line-height: 0; }
+b, strong { font-weight: 700; }
+
+.c-obs { color: var(--obs); } .c-mamba { color: var(--mamba); } .c-kal { color: var(--kal); }
+.c-pol { color: var(--pol); } .c-reg { color: var(--reg); }
+
+.toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; font-size: 0.92rem; }
+.toc a { color: var(--ink-2); text-decoration: none; border-bottom: 1px solid var(--line); }
+.toc a:hover, .toc a:focus-visible { color: var(--ink); border-color: var(--ink); }
+a:focus-visible, input:focus-visible { outline: 2px solid var(--obs); outline-offset: 2px; }
+
+.oneline {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 1.1rem 1.3rem; font-size: 1.05rem;
+}
+
+/* concept list */
+.concepts { display: grid; grid-template-columns: 9.5rem 1fr; gap: 1.1rem 1.4rem; }
+.concepts dt { font-weight: 700; }
+.concepts dd { margin: 0; min-width: 0; color: var(--ink-2); }
+.concepts dd p + p { margin-top: 0.5rem; }
+@media (max-width: 560px) { .concepts { grid-template-columns: 1fr; gap: 0.3rem; } .concepts dd { margin-bottom: 0.8rem; } }
+
+.eq {
+  font-family: var(--f-mono); font-size: 0.9rem; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem 1rem; overflow-x: auto;
+  line-height: 1.9; white-space: nowrap;
+}
+
+figure { margin: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.fig-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.fig-scroll svg { display: block; min-width: 760px; width: 100%; height: auto; }
+figcaption { font-size: 0.88rem; color: var(--muted); }
+
+/* SVG styling through tokens */
+svg text { font-family: var(--f-body); fill: var(--ink); }
+svg .t-title { font-size: 14px; font-weight: 700; }
+svg .t-sub { font-size: 11.5px; font-family: var(--f-mono); fill: var(--ink-2); }
+svg .t-note { font-size: 12px; fill: var(--muted); }
+svg .t-lane { font-size: 13px; font-weight: 700; }
+svg .arrow { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+svg .ah { fill: var(--ink-2); }
+svg .box { stroke-width: 1.6; }
+svg .b-obs { fill: color-mix(in srgb, var(--obs) 12%, var(--surface)); stroke: var(--obs); }
+svg .b-mamba { fill: color-mix(in srgb, var(--mamba) 12%, var(--surface)); stroke: var(--mamba); }
+svg .b-kal { fill: color-mix(in srgb, var(--kal) 12%, var(--surface)); stroke: var(--kal); }
+svg .b-pol { fill: color-mix(in srgb, var(--pol) 13%, var(--surface)); stroke: var(--pol); }
+svg .reg { stroke: var(--reg); stroke-width: 1.8; stroke-dasharray: 6 5; fill: none; }
+svg .ah-reg { fill: var(--reg); }
+svg .t-reg { fill: var(--reg); font-size: 12px; font-weight: 500; }
+svg .tag { fill: var(--surface); stroke: var(--muted); stroke-width: 1; }
+svg .t-tag { font-size: 10.5px; fill: var(--muted); }
+svg .node { fill: var(--kal); }
+svg .tree { stroke: var(--kal); stroke-width: 1.5; fill: none; }
+svg .divider { stroke: var(--line); stroke-width: 1; }
+
+.steps { counter-reset: s; list-style: none; padding: 0; gap: 0.7rem; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 2rem 1fr; gap: 0.6rem; }
+.steps li::before {
+  content: counter(s); font-family: var(--f-mono); font-size: 0.85rem; font-weight: 500;
+  width: 1.7rem; height: 1.7rem; border-radius: 50%; border: 1px solid var(--line);
+  display: grid; place-items: center; margin-top: 0.2rem; color: var(--ink-2); background: var(--surface);
+}
+.steps li > div { min-width: 0; }
+
+/* tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; line-height: 1.6; }
+th, td { text-align: left; vertical-align: top; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--line); }
+th { font-size: 0.78rem; letter-spacing: 0.06em; color: var(--muted); font-weight: 500; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td .mono { white-space: nowrap; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; font-family: var(--f-mono); }
+.part { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; margin-right: 0.45rem; vertical-align: 0.05em; }
+.module-table { min-width: 760px; }
+.module-table td:first-child { white-space: nowrap; font-weight: 700; }
+.group-row td { background: color-mix(in srgb, var(--line) 35%, var(--surface)); font-size: 0.78rem; letter-spacing: 0.06em; color: var(--ink-2); padding-block: 0.35rem; }
+
+/* Kalman demo */
+.demo { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.demo-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.6rem 1.4rem; }
+.demo label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.88rem; color: var(--ink-2); }
+.demo label span.v { font-family: var(--f-mono); color: var(--ink); }
+.demo input[type=range] { width: 100%; accent-color: var(--kal); }
+.demo svg { width: 100%; height: auto; display: block; }
+.demo .readout { display: flex; flex-wrap: wrap; gap: 0.3rem 1.4rem; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.demo .readout b { font-family: var(--f-mono); font-weight: 500; }
+
+.note {
+  border-left: 3px solid var(--line); padding: 0.2rem 0 0.2rem 1rem; color: var(--ink-2); font-size: 0.94rem;
+}
+.callout { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+footer { font-size: 0.85rem; color: var(--muted); }
+@media (max-width: 560px) { h1 { font-size: 1.75rem; } h2 { font-size: 1.3rem; } body { font-size: 15.5px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+
+<header style="display:flex;flex-direction:column;gap:0.9rem">
+  <div class="eyebrow">论文复现笔记 · Becker 等，2024，arXiv 2406.15131</div>
+  <h1>KalMamba 结构图解</h1>
+  <p class="lead">写给没接触过这类模型的人：KalMamba 由哪几块组成，每块吃进什么、吐出什么，数据怎么流动，为什么能比同类方法快几十倍。数字都取自论文和我们的复现代码。</p>
+  <nav class="toc" aria-label="目录">
+    <a href="#problem">要解决的问题</a>
+    <a href="#concepts">预备概念</a>
+    <a href="#overview">整体结构</a>
+    <a href="#modules">各模块输入输出</a>
+    <a href="#parallel">为什么能并行</a>
+    <a href="#training">怎么训练</a>
+    <a href="#acting">怎么执行</a>
+    <a href="#compare">与对照方法比较</a>
+    <a href="#repro">复现注记</a>
+  </nav>
+</header>
+
+<div class="oneline">
+  <b>一句话：</b>KalMamba 是一个“世界模型”。它从带噪声的传感器读数中，推断出机器人真实状态的<b>概率分布</b>（最可能的值加上有多不确定），再把这个推断结果交给一个强化学习算法（SAC）去决定下一步动作。它的特别之处在于，训练时整段序列可以<b>沿时间并行</b>计算，所以序列越长优势越大。
+</div>
+
+<section id="problem">
+  <h2>要解决的问题</h2>
+  <p>以 DeepMind Control 里的 <b>Walker</b>（一个两条腿的平面机器人）为例。每一步，环境给出 24 个数（关节角度、速度、躯干朝向等），智能体要输出 6 个数（6 个关节的力矩），目标是走得快又稳。</p>
+  <p>论文专门把任务改难了：每个观测值都加了标准差 0.3 的高斯噪声，动作在执行时也被加了噪声。于是单看某一步的 24 个数，你并不知道机器人“真正”在什么状态。要把事情做好，模型需要三样能力：</p>
+  <ul>
+    <li><b>记忆</b>：把过去很多步的观测和动作综合起来，滤掉噪声。</li>
+    <li><b>不确定性</b>：不仅给出“我认为状态是什么”，还要给出“我有多确定”。噪声越大，这一点越重要。</li>
+    <li><b>速度</b>：训练要反复处理成千上万段序列，序列越长越好用，但不能慢到跑不动。</li>
+  </ul>
+  <p>此前的方法大多只能兼顾前两样：能好好处理不确定性的模型（如 VRKN），计算必须一步接一步地进行，序列一长就很慢。KalMamba 的目标是三样都要。</p>
+</section>
+
+<section id="concepts">
+  <h2>预备概念</h2>
+  <p>理解 KalMamba 只需要下面六个概念。每个只讲到够用为止。</p>
+  <dl class="concepts">
+    <dt>隐状态 z<sub>t</sub></dt>
+    <dd><p>我们看不到的“真实状态”，用一个 230 维的向量表示。它不是人为定义的物理量，而是模型自己学出来的一种压缩表示。观测 o<sub>t</sub> 是它的带噪声的“影子”。</p></dd>
+
+    <dt>状态空间模型</dt>
+    <dd><p>用两条规则描述世界：<b>动力学</b>说明状态如何随动作变化（z<sub>t</sub>, a<sub>t</sub> → z<sub>t+1</sub>），<b>观测模型</b>说明状态如何产生观测（z<sub>t</sub> → o<sub>t</sub>）。两条规则都带噪声。</p></dd>
+
+    <dt>高斯信念</dt>
+    <dd><p>我们对 z<sub>t</sub> 的了解用正态分布表示：一个<b>均值</b>（最可能的值）和一个<b>方差</b>（不确定程度）。KalMamba 里所有方差都是“对角的”，也就是 230 个维度各自独立，所以只需 230 个均值和 230 个方差。</p></dd>
+
+    <dt>卡尔曼滤波</dt>
+    <dd>
+      <p>如果动力学是线性的、噪声是高斯的，那么信念可以用公式精确更新，每一步两件事：</p>
+      <p><b>预测</b>：用动力学把上一步的信念往前推一步，不确定性会变大。<br><b>更新</b>：拿到新观测后，按“谁更可信”加权合并预测和观测，不确定性变小。</p>
+      <p>权重叫<b>卡尔曼增益</b> k = 预测方差 ÷（预测方差 + 观测方差）。下面的小演示可以拖动看看。</p>
+    </dd>
+
+    <dt>滤波 与 平滑</dt>
+    <dd><p><b>滤波</b>信念只用到当前及以前的观测，执行动作时只能用它（未来还没发生）。<b>平滑</b>信念还用上了之后的观测，回过头修正过去的估计，更准确。训练时数据是完整录好的序列，所以可以用平滑。</p></dd>
+
+    <dt>并行扫描</dt>
+    <dd>
+      <p>求 [3, 1, 4, 1, 5, 9, 2, 6] 的累加和，最直接的做法是从左到右加 7 次，每次都要等上一次。但加法满足结合律，可以先两两相加，再把结果两两相加：3 层就够。长度为 T 的序列只需约 log<sub>2</sub>T 层，每层里的运算可以同时在 GPU 上做。</p>
+      <p>关键发现（Särkkä 与 García-Fernández，2020）：卡尔曼滤波和平滑的每一步，也可以写成满足结合律的“合并”运算，因此同样可以这样并行。</p>
+    </dd>
+
+    <dt>Mamba</dt>
+    <dd><p>一种处理序列的神经网络（2023 年提出），可以看作 Transformer 的替代品。它内部也是线性递推，所以训练时能用并行扫描一次处理整条序列；执行时又能像 RNN 一样一步一步算，只保留一个固定大小的内部状态。它输出的每个位置只看到该位置及之前的输入。</p></dd>
+  </dl>
+
+  <div class="demo" aria-label="一维卡尔曼更新演示">
+    <h3>一维卡尔曼更新</h3>
+    <div class="demo-controls">
+      <label for="pv">预测方差（预测有多不确定）<span class="v" id="pv-out"></span>
+        <input id="pv" type="range" min="0.02" max="2" step="0.02" value="0.5"></label>
+      <label for="ov">观测方差（传感器有多吵）<span class="v" id="ov-out"></span>
+        <input id="ov" type="range" min="0.02" max="2" step="0.02" value="0.5"></label>
+    </div>
+    <svg id="demo-svg" viewBox="0 0 640 190" role="img" aria-label="预测、观测和合并后信念的三条钟形曲线"></svg>
+    <div class="readout">
+      <span>预测均值 <b>0.00</b></span>
+      <span>观测值 <b>1.00</b></span>
+      <span>增益 k = <b id="k-out"></b></span>
+      <span class="c-kal">合并后均值 <b id="pm-out"></b></span>
+      <span class="c-kal">合并后方差 <b id="pvv-out"></b></span>
+    </div>
+    <p class="small muted">观测越吵，增益越小，合并结果越靠近预测；预测越不确定，越相信观测。无论怎样，合并后的方差都比两者都小。KalMamba 每一步、每一维都在做这件事。</p>
+  </div>
+</section>
+
+<section id="overview">
+  <h2>整体结构</h2>
+  <p>KalMamba 可以分成四部分，图和下文用同一套颜色：
+    <span class="c-obs"><b>编码</b></span>（把观测变成隐空间里的“测量”），
+    <span class="c-mamba"><b>动力学路径</b></span>（用 Mamba 预先算好每一步的动力学参数），
+    <span class="c-kal"><b>卡尔曼推断</b></span>（并行滤波与平滑），
+    <span class="c-pol"><b>策略</b></span>（SAC 根据滤波信念选动作）。</p>
+</section>
+
+<figure class="wide">
+  <div class="fig-scroll">
+  <svg viewBox="0 0 960 600" role="img" aria-label="KalMamba 数据流图：观测经编码器得到 w_t；w_t 和上一步动作进入 Mamba 得到 m_t；m_t 和当前动作经动力学头得到 A、b、Σ；卡尔曼滤波用 A、b、Σ 和 w_t 得到滤波信念；滤波信念交给 SAC，也交给平滑器，平滑信念用于解码和损失；虚线正则项让 m_t 靠近滤波均值。">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+      <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-reg" d="M0,0 L10,5 L0,10 z"/></marker>
+    </defs>
+
+    <!-- lane label -->
+    <text class="t-lane" x="20" y="86" style="fill:var(--mamba)">动力学路径</text>
+    <text class="t-note" x="20" y="106">预先算好每一步的</text>
+    <text class="t-note" x="20" y="123">A, b, Σ（可并行）</text>
+
+    <!-- regularizer (drawn first, under boxes) -->
+    <path class="reg" d="M725,124 L725,160 L470,160 L470,392 L486,392" marker-end="url(#ahr)"/>
+    <text class="t-reg" x="597" y="152" text-anchor="middle">正则项 R：让 mₜ 靠近滤波均值 μ⁺ₜ</text>
+
+    <!-- upper lane -->
+    <path class="arrow" d="M375,24 L375,58" marker-end="url(#ah)"/>
+    <text class="t-note" x="383" y="40">上一步动作 aₜ₋₁</text>
+    <rect class="box b-mamba" x="300" y="60" width="150" height="64" rx="8"/>
+    <text class="t-title" x="375" y="87" text-anchor="middle">前置网络</text>
+    <text class="t-sub" x="375" y="108" text-anchor="middle">[wₜ, aₜ₋₁] → 256</text>
+
+    <path class="arrow" d="M450,92 L488,92" marker-end="url(#ah)"/>
+    <rect class="box b-mamba" x="490" y="60" width="150" height="64" rx="8"/>
+    <text class="t-title" x="565" y="87" text-anchor="middle">Mamba × 2 块</text>
+    <text class="t-sub" x="565" y="108" text-anchor="middle">256 → 256</text>
+
+    <path class="arrow" d="M640,92 L678,92" marker-end="url(#ah)"/>
+    <rect class="box b-mamba" x="680" y="60" width="90" height="64" rx="8"/>
+    <text class="t-title" x="725" y="87" text-anchor="middle">mₜ</text>
+    <text class="t-sub" x="725" y="108" text-anchor="middle">230</text>
+
+    <path class="arrow" d="M770,92 L808,92" marker-end="url(#ah)"/>
+    <path class="arrow" d="M877,24 L877,58" marker-end="url(#ah)"/>
+    <text class="t-note" x="869" y="40" text-anchor="end">当前动作 aₜ</text>
+    <rect class="box b-mamba" x="810" y="60" width="135" height="64" rx="8"/>
+    <text class="t-title" x="877" y="87" text-anchor="middle">动力学头</text>
+    <text class="t-sub" x="877" y="108" text-anchor="middle">→ Aₜ, bₜ, Σₜ</text>
+
+    <!-- middle lane -->
+    <rect class="box b-obs" x="20" y="220" width="105" height="64" rx="8"/>
+    <text class="t-title" x="72" y="247" text-anchor="middle">观测 oₜ</text>
+    <text class="t-sub" x="72" y="268" text-anchor="middle">24 维·带噪</text>
+
+    <path class="arrow" d="M125,252 L148,252" marker-end="url(#ah)"/>
+    <rect class="box b-obs" x="150" y="220" width="125" height="64" rx="8"/>
+    <text class="t-title" x="212" y="247" text-anchor="middle">编码器 φ</text>
+    <text class="t-sub" x="212" y="268" text-anchor="middle">24 → 256 → 230</text>
+
+    <path class="arrow" d="M275,252 L298,252" marker-end="url(#ah)"/>
+    <rect class="box b-obs" x="300" y="220" width="150" height="64" rx="8"/>
+    <text class="t-title" x="375" y="247" text-anchor="middle">测量 wₜ, 方差 Σʷₜ</text>
+    <text class="t-sub" x="375" y="268" text-anchor="middle">各 230 维</text>
+    <path class="arrow" d="M375,220 L375,126" marker-end="url(#ah)"/>
+
+    <path class="arrow" d="M450,252 L488,252" marker-end="url(#ah)"/>
+    <rect class="box b-kal" x="490" y="220" width="455" height="64" rx="8"/>
+    <text class="t-title" x="717" y="247" text-anchor="middle">并行卡尔曼滤波</text>
+    <text class="t-sub" x="717" y="268" text-anchor="middle">关联扫描：所有时间步一起算</text>
+    <path class="arrow" d="M877,124 L877,218" marker-end="url(#ah)"/>
+    <text class="t-sub" x="885" y="178">Aₜ,bₜ,Σₜ</text>
+
+    <!-- lower lane -->
+    <path class="arrow" d="M595,284 L595,358" marker-end="url(#ah)"/>
+    <rect class="box b-kal" x="490" y="360" width="210" height="64" rx="8"/>
+    <text class="t-title" x="595" y="387" text-anchor="middle">滤波信念 μ⁺ₜ, Σ⁺ₜ</text>
+    <text class="t-sub" x="595" y="408" text-anchor="middle">只用过去 · 230 维</text>
+
+    <path class="arrow" d="M700,392 L733,392" marker-end="url(#ah)"/>
+    <rect class="box b-kal" x="735" y="360" width="210" height="64" rx="8"/>
+    <text class="t-title" x="840" y="387" text-anchor="middle">并行平滑</text>
+    <text class="t-sub" x="840" y="408" text-anchor="middle">也用未来 → μˢₜ, Σˢₜ</text>
+    <rect class="tag" x="893" y="351" width="46" height="18" rx="9"/>
+    <text class="t-tag" x="916" y="364" text-anchor="middle">训练时</text>
+
+    <!-- bottom lane -->
+    <path class="arrow" d="M595,424 L595,488" marker-end="url(#ah)"/>
+    <text class="t-note" x="587" y="461" text-anchor="end">均值 μ⁺ₜ（梯度截断）</text>
+    <rect class="box b-pol" x="490" y="490" width="210" height="70" rx="8"/>
+    <text class="t-title" x="595" y="519" text-anchor="middle">SAC 策略</text>
+    <text class="t-sub" x="595" y="541" text-anchor="middle">actor + 双 Q critic</text>
+    <path class="arrow" d="M490,525 L302,525" marker-end="url(#ah)"/>
+    <text class="t-note" x="396" y="517" text-anchor="middle">动作 aₜ → 环境</text>
+
+    <path class="arrow" d="M840,424 L840,488" marker-end="url(#ah)"/>
+    <text class="t-note" x="848" y="461">采样 zₜ</text>
+    <rect class="box b-kal" x="735" y="490" width="210" height="70" rx="8"/>
+    <text class="t-title" x="840" y="519" text-anchor="middle">解码器 → 损失</text>
+    <text class="t-sub" x="840" y="541" text-anchor="middle">ôₜ (24)，r̂ₜ (1)</text>
+    <rect class="tag" x="893" y="481" width="46" height="18" rx="9"/>
+    <text class="t-tag" x="916" y="494" text-anchor="middle">训练时</text>
+
+    <!-- legend -->
+    <g transform="translate(20,345)">
+      <text class="t-lane" x="0" y="0">图例</text>
+      <rect class="box b-obs" x="0" y="14" width="16" height="12" rx="3"/><text class="t-note" x="24" y="25">编码</text>
+      <rect class="box b-mamba" x="0" y="38" width="16" height="12" rx="3"/><text class="t-note" x="24" y="49">动力学路径（Mamba）</text>
+      <rect class="box b-kal" x="0" y="62" width="16" height="12" rx="3"/><text class="t-note" x="24" y="73">卡尔曼推断与解码</text>
+      <rect class="box b-pol" x="0" y="86" width="16" height="12" rx="3"/><text class="t-note" x="24" y="97">策略（SAC）</text>
+      <path class="reg" d="M0,116 L16,116"/><text class="t-note" x="24" y="121">只在训练损失里出现</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>图 1　一个时间步内的数据流（训练时，所有时间步同时这样算）。形状以 Walker 为例：观测 24 维、动作 6 维、隐状态 230 维。</figcaption>
+</figure>
+
+<section>
+  <h3>按顺序走一遍</h3>
+  <ol class="steps">
+    <li><div><span class="c-obs"><b>编码。</b></span>观测 o<sub>t</sub>（24 个数）经过编码器 φ，变成隐空间里的一个“测量” w<sub>t</sub>（230 个数）和它的方差 Σ<sup>w</sup><sub>t</sub>（230 个数，表示编码器对这次测量有多不放心）。论文假设 w<sub>t</sub> = z<sub>t</sub> + 噪声，也就是说 w<sub>t</sub> 就是对隐状态的一次带噪声的直接测量。这样复杂的“状态 → 观测”关系由神经网络负责，隐空间里的推断却保持简单。</div></li>
+    <li><div><span class="c-mamba"><b>总结历史。</b></span>把 w<sub>t</sub> 和上一步动作 a<sub>t−1</sub> 拼在一起，经过一个小网络，再送进两层 Mamba。Mamba 在每个时间步输出一个向量，再投影成 230 维的 m<sub>t</sub>。m<sub>t</sub> 概括了“到目前为止看到的所有观测和动作”，信息量与滤波信念相同。</div></li>
+    <li><div><span class="c-mamba"><b>算动力学参数。</b></span>把 m<sub>t</sub> 和当前动作 a<sub>t</sub> 拼起来，经过动力学头，得到从 t 到 t+1 的线性动力学：z<sub>t+1</sub> = A<sub>t</sub> z<sub>t</sub> + b<sub>t</sub> + 噪声（噪声方差 Σ<sub>t</sub>）。A<sub>t</sub> 是对角的，每个值被限制在 0.4 到 0.99 之间，保证状态不会发散。注意：真实世界是非线性的，但每一步都换一套由历史决定的线性参数，就能近似非线性（这叫“局部线性化”）。</div></li>
+    <li><div><span class="c-kal"><b>卡尔曼滤波。</b></span>现在所有步的 A<sub>t</sub>, b<sub>t</sub>, Σ<sub>t</sub> 和 w<sub>t</sub>, Σ<sup>w</sup><sub>t</sub> 都已备好，用并行扫描一次算出所有步的滤波信念（均值 μ<sup>+</sup><sub>t</sub>、方差 Σ<sup>+</sup><sub>t</sub>）。起点是一个可学习方差的零均值高斯 p(z<sub>0</sub>)。</div></li>
+    <li><div><span class="c-kal"><b>平滑（仅训练）。</b></span>再用一次反向并行扫描，把未来的信息带回来，得到平滑信念。从平滑信念里采样 z<sub>t</sub>，用两个解码器重建观测 ô<sub>t</sub> 和奖励 r̂<sub>t</sub>，算训练损失。</div></li>
+    <li><div><span class="c-pol"><b>决策。</b></span>SAC 的 actor 读入滤波均值 μ<sup>+</sup><sub>t</sub>，输出动作；critic 读入 μ<sup>+</sup><sub>t</sub> 和动作，估计长期回报。SAC 的梯度不会传回世界模型，两者各自训练。</div></li>
+  </ol>
+</section>
+
+<section id="modules">
+  <h2>各模块输入输出</h2>
+  <p>下表中 B 是一批里的序列数，T 是每段序列的长度。训练时 B = 32、T = 32。“维度”以 Walker 为例；其他任务只有观测维度和动作维度不同（Cartpole 5 / 1，Quadruped 78 / 12，Walker 24 / 6）。</p>
+</section>
+
+<div class="wide table-wrap">
+  <table class="module-table">
+    <thead><tr><th>模块</th><th>输入</th><th>输出</th><th>内部结构</th></tr></thead>
+    <tbody>
+      <tr class="group-row"><td colspan="4"><span class="part" style="background:var(--obs)"></span>编码</td></tr>
+      <tr><td>编码器 φ</td><td>观测 o<sub>t</sub> <span class="mono">(B,T,24)</span></td><td>特征 <span class="mono">(B,T,256)</span></td><td>2 层 × 256 单元全连接，ELU 激活</td></tr>
+      <tr><td>隐测量层</td><td>特征 <span class="mono">(…,256)</span></td><td>w<sub>t</sub> <span class="mono">(…,230)</span>，Σ<sup>w</sup><sub>t</sub> <span class="mono">(…,230)</span></td><td>线性层输出均值和方差；方差下限 0.01</td></tr>
+
+      <tr class="group-row"><td colspan="4"><span class="part" style="background:var(--mamba)"></span>动力学路径</td></tr>
+      <tr><td>前置网络</td><td>[w<sub>t</sub>, a<sub>t−1</sub>] <span class="mono">(…,236)</span></td><td><span class="mono">(…,256)</span></td><td>2 层 × 256，SiLU，MC Dropout 0.1，再线性到 256</td></tr>
+      <tr><td>Mamba 块 × 2</td><td><span class="mono">(B,T,256)</span></td><td><span class="mono">(B,T,256)</span></td><td>每块：LayerNorm → Mamba → 残差相加。d_state 64，d_conv 2，expand 2（内部宽 512）</td></tr>
+      <tr><td>后置投影</td><td><span class="mono">(…,256)</span></td><td>m<sub>t</sub> <span class="mono">(…,230)</span></td><td>LayerNorm + 线性层</td></tr>
+      <tr><td>动力学头</td><td>[m<sub>t</sub>, a<sub>t</sub>] <span class="mono">(…,236)</span></td><td>A<sub>t</sub>，b<sub>t</sub>，Σ<sub>t</sub> 各 <span class="mono">(B,T−1,230)</span></td><td>线性 300 + SiLU + Dropout → GRUCell（隐藏态取 m<sub>t</sub>，只算一步）→ 线性 300 → 线性 690，切成三份。A ∈ [0.4, 0.99]，Σ ∈ [0.001, 0.1]，b 不限</td></tr>
+
+      <tr class="group-row"><td colspan="4"><span class="part" style="background:var(--kal)"></span>卡尔曼推断（除初始方差 Σ<sub>0</sub> 外没有可学参数）</td></tr>
+      <tr><td>并行滤波</td><td>p(z<sub>0</sub>) = N(0, Σ<sub>0</sub>)；A, b, Σ；w, Σ<sup>w</sup></td><td>滤波 μ<sup>+</sup><sub>t</sub>, Σ<sup>+</sup><sub>t</sub> <span class="mono">(B,T,230)</span>，以及一步预测</td><td>前向关联扫描，全部逐元素运算</td></tr>
+      <tr><td>并行平滑</td><td>滤波结果，A<sub>t</sub></td><td>平滑 μ<sup>s</sup><sub>t</sub>, Σ<sup>s</sup><sub>t</sub> <span class="mono">(B,T,230)</span></td><td>反向关联扫描（Rauch–Tung–Striebel 平滑）</td></tr>
+      <tr><td>观测解码器</td><td>采样 z<sub>t</sub> <span class="mono">(…,230)</span></td><td>ô<sub>t</sub> <span class="mono">(…,24)</span></td><td>2 层 × 256，ELU；输出高斯，标准差固定为 1</td></tr>
+      <tr><td>奖励解码器</td><td>采样 z<sub>t</sub> <span class="mono">(…,230)</span></td><td>r̂<sub>t</sub> <span class="mono">(…,1)</span></td><td>2 层 × 256，ELU</td></tr>
+
+      <tr class="group-row"><td colspan="4"><span class="part" style="background:var(--pol)"></span>策略（SAC）</td></tr>
+      <tr><td>Actor</td><td>μ<sup>+</sup><sub>t</sub> <span class="mono">(…,230)</span></td><td>动作 a<sub>t</sub> <span class="mono">(…,6)</span>，范围 [−1, 1]</td><td>2 层 × 256，ReLU；输出高斯后经 tanh 压缩</td></tr>
+      <tr><td>Critic</td><td>[μ<sup>+</sup><sub>t</sub>, a<sub>t</sub>] <span class="mono">(…,236)</span></td><td>两个 Q 值</td><td>两个 2 层 × 256 ReLU 网络，取较小者（减轻高估）</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<section>
+  <div class="note">
+    <p><b>MC Dropout 是什么？</b>在前置网络和动力学头里随机“关掉”10% 的神经元。它让模型对自己没见过的情况给出不太确定的动力学，论文沿用 VRKN 的做法，认为这对平滑推断很关键。</p>
+  </div>
+  <div class="note">
+    <p><b>时间下标为什么一个是 a<sub>t−1</sub>，一个是 a<sub>t</sub>？</b>m<sub>t</sub> 要和滤波信念 q(z<sub>t</sub> | o<sub>≤t</sub>, a<sub>≤t−1</sub>) 看到同样的信息，所以输入是“到 t 为止的观测”和“到 t−1 为止的动作”。动力学头描述 t → t+1，需要这一步要做的动作 a<sub>t</sub>。因此 A<sub>t</sub> 只依赖过去和当下，从不偷看 w<sub>t+1</sub>，滤波依然是因果的。</p>
+  </div>
+</section>
+
+<section id="parallel">
+  <h2>为什么能并行</h2>
+  <p>KalMamba 的前身 VRKN 用的是同样的线性高斯隐空间模型，也能做平滑。区别只在一个地方：<b>动力学参数从哪里来</b>。</p>
+  <ul>
+    <li>VRKN 拿上一步的<b>滤波均值</b>去算 A<sub>t</sub>。而滤波均值又要用 A<sub>t−1</sub> 才能算出。这是一条环环相扣的链，只能一步一步来。</li>
+    <li>KalMamba 改用 Mamba 输出的 m<sub>t</sub> 去算 A<sub>t</sub>。m<sub>t</sub> 只依赖观测和动作，不依赖滤波结果，所以可以先用 Mamba 一次性算出所有步的参数，再用并行扫描一次性完成滤波和平滑。两次都是 log T 级别的层数。</li>
+  </ul>
+  <p>代价是：m<sub>t</sub> 不再“天然”就是滤波均值。为此论文加了一个正则项 R，把 m<sub>t</sub> 拉向滤波均值（见“怎么训练”）。</p>
+</section>
+
+<figure class="wide">
+  <div class="fig-scroll">
+  <svg viewBox="0 0 960 380" role="img" aria-label="左：VRKN 的滤波链，每一步都要等上一步；右：KalMamba 先用 Mamba 并行算出全部参数，再用三层树状合并完成扫描。">
+    <defs>
+      <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+    </defs>
+    <text class="t-lane" x="20" y="34">VRKN：每一步都要等上一步</text>
+    <text class="t-note" x="20" y="54">A<tspan baseline-shift="sub" font-size="9">t</tspan> 由上一步的滤波均值算出</text>
+    <g>
+      <rect class="box b-kal" x="30" y="150" width="62" height="44" rx="7"/><text class="t-sub" x="61" y="177" text-anchor="middle">μ⁺₁</text>
+      <rect class="box b-kal" x="122" y="150" width="62" height="44" rx="7"/><text class="t-sub" x="153" y="177" text-anchor="middle">μ⁺₂</text>
+      <rect class="box b-kal" x="214" y="150" width="62" height="44" rx="7"/><text class="t-sub" x="245" y="177" text-anchor="middle">μ⁺₃</text>
+      <rect class="box b-kal" x="306" y="150" width="62" height="44" rx="7"/><text class="t-sub" x="337" y="177" text-anchor="middle">μ⁺₄</text>
+      <rect class="box b-kal" x="398" y="150" width="42" height="44" rx="7"/><text class="t-sub" x="419" y="177" text-anchor="middle">…</text>
+      <path class="arrow" d="M92,172 L120,172" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M184,172 L212,172" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M276,172 L304,172" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M368,172 L396,172" marker-end="url(#ah2)"/>
+      <text class="t-sub" x="106" y="140" text-anchor="middle">A,b,Σ</text>
+      <text class="t-sub" x="198" y="140" text-anchor="middle">A,b,Σ</text>
+      <text class="t-sub" x="290" y="140" text-anchor="middle">A,b,Σ</text>
+      <text class="t-sub" x="382" y="140" text-anchor="middle">A,b,Σ</text>
+      <path class="arrow" d="M61,246 L61,196" marker-end="url(#ah2)"/><text class="t-sub" x="61" y="262" text-anchor="middle">w₁</text>
+      <path class="arrow" d="M153,246 L153,196" marker-end="url(#ah2)"/><text class="t-sub" x="153" y="262" text-anchor="middle">w₂</text>
+      <path class="arrow" d="M245,246 L245,196" marker-end="url(#ah2)"/><text class="t-sub" x="245" y="262" text-anchor="middle">w₃</text>
+      <path class="arrow" d="M337,246 L337,196" marker-end="url(#ah2)"/><text class="t-sub" x="337" y="262" text-anchor="middle">w₄</text>
+    </g>
+    <text class="t-title" x="20" y="316">T 步 = T 轮顺序计算</text>
+    <text class="t-note" x="20" y="338">序列从 32 变成 2048，耗时大约也乘以 64</text>
+
+    <line class="divider" x1="475" y1="20" x2="475" y2="360"/>
+
+    <text class="t-lane" x="505" y="34">KalMamba：两次并行</text>
+    <text class="t-note" x="505" y="54">参数不依赖滤波结果，可以先全部算好</text>
+    <rect class="box b-mamba" x="525" y="72" width="404" height="36" rx="7"/>
+    <text class="t-title" x="727" y="95" text-anchor="middle">Mamba 一次处理整条序列</text>
+    <g>
+      <path class="arrow" d="M545,108 L545,132" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M597,108 L597,132" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M649,108 L649,132" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M701,108 L701,132" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M753,108 L753,132" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M805,108 L805,132" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M857,108 L857,132" marker-end="url(#ah2)"/>
+      <path class="arrow" d="M909,108 L909,132" marker-end="url(#ah2)"/>
+      <rect class="box b-kal" x="527" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="545" y="155" text-anchor="middle">1</text>
+      <rect class="box b-kal" x="579" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="597" y="155" text-anchor="middle">2</text>
+      <rect class="box b-kal" x="631" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="649" y="155" text-anchor="middle">3</text>
+      <rect class="box b-kal" x="683" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="701" y="155" text-anchor="middle">4</text>
+      <rect class="box b-kal" x="735" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="753" y="155" text-anchor="middle">5</text>
+      <rect class="box b-kal" x="787" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="805" y="155" text-anchor="middle">6</text>
+      <rect class="box b-kal" x="839" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="857" y="155" text-anchor="middle">7</text>
+      <rect class="box b-kal" x="891" y="134" width="36" height="32" rx="6"/><text class="t-sub" x="909" y="155" text-anchor="middle">8</text>
+      <!-- level 1 -->
+      <path class="tree" d="M545,166 L571,206 M597,166 L571,206 M649,166 L675,206 M701,166 L675,206 M753,166 L779,206 M805,166 L779,206 M857,166 L883,206 M909,166 L883,206"/>
+      <circle class="node" cx="571" cy="210" r="6"/><circle class="node" cx="675" cy="210" r="6"/><circle class="node" cx="779" cy="210" r="6"/><circle class="node" cx="883" cy="210" r="6"/>
+      <!-- level 2 -->
+      <path class="tree" d="M571,216 L623,256 M675,216 L623,256 M779,216 L831,256 M883,216 L831,256"/>
+      <circle class="node" cx="623" cy="260" r="6"/><circle class="node" cx="831" cy="260" r="6"/>
+      <!-- level 3 -->
+      <path class="tree" d="M623,266 L727,302 M831,266 L727,302"/>
+      <circle class="node" cx="727" cy="306" r="6"/>
+    </g>
+    <text class="t-title" x="505" y="342">8 步只需 3 层合并，2048 步只需 11 层</text>
+    <text class="t-note" x="505" y="362">每个方块是一步的卡尔曼“算子”（参数 + 测量），绿点是两两合并</text>
+  </svg>
+  </div>
+  <figcaption>图 2　依赖关系对比。右图只画了扫描的“向上合并”一半，示意层数随序列长度按 log<sub>2</sub>T 增长；平滑是同样的扫描反过来再做一次。</figcaption>
+</figure>
+
+<section>
+  <p>每一步卡尔曼滤波在对角情形下只是几行逐元素公式（i 表示第 i 维，230 维完全独立）：</p>
+  <div class="eq">
+    预测：μ⁻<sub>t</sub> = A<sub>t−1</sub> · μ⁺<sub>t−1</sub> + b<sub>t−1</sub>　　　σ²⁻<sub>t</sub> = A²<sub>t−1</sub> · σ²⁺<sub>t−1</sub> + Σ<sub>t−1</sub><br>
+    更新：k<sub>t</sub> = σ²⁻<sub>t</sub> / (σ²⁻<sub>t</sub> + Σ<sup>w</sup><sub>t</sub>)　　μ⁺<sub>t</sub> = μ⁻<sub>t</sub> + k<sub>t</sub> · (w<sub>t</sub> − μ⁻<sub>t</sub>)　　σ²⁺<sub>t</sub> = (1 − k<sub>t</sub>) · σ²⁻<sub>t</sub>
+  </div>
+  <p>执行动作时就按这两行一步一步算。训练时把同样的计算改写成可两两合并的形式，交给并行扫描。两种算法结果相同（我们的测试检查过逐步与并行的结果一致）。</p>
+</section>
+
+<section id="training">
+  <h2>怎么训练</h2>
+  <p>世界模型和 SAC 交替训练，用同一个回放缓冲区里的数据。</p>
+  <h3>世界模型的损失</h3>
+  <p>损失是对每段 32 步序列计算、再在批内平均的四项之和。前三项来自变分推断（ELBO，“证据下界”），第四项是 KalMamba 新加的：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>项</th><th>直观含义</th><th>细节</th></tr></thead>
+      <tbody>
+        <tr><td><b>观测重建</b></td><td>从平滑信念里采样的 z<sub>t</sub> 应能还原出观测</td><td>解码器输出高斯，标准差固定为 1，相当于均方误差</td></tr>
+        <tr><td><b>奖励预测</b></td><td>z<sub>t</sub> 应包含与任务相关的信息</td><td>严格说不是必须，但帮助表示聚焦于控制</td></tr>
+        <tr><td><b>KL 项</b></td><td>平滑推断出的“z<sub>t−1</sub> → z<sub>t</sub>”应与学到的动力学一致</td><td>KL 平衡 0.5（推断和动力学各让一半）；自由比特 3 nats（低于 3 不罚）</td></tr>
+        <tr><td><b class="c-reg">正则项 α·R</b></td><td>m<sub>t</sub> 应接近滤波均值 μ<sup>+</sup><sub>t</sub>，防止信息绕过卡尔曼滤波，直接经 Mamba 偷偷传递</td><td>马氏距离：Σ<sub>i</sub> (m<sub>t,i</sub> − μ<sup>+</sup><sub>t,i</sub>)² / Σ<sup>+</sup><sub>t,i</sub>；论文 α = 1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>论文强调平滑推断让这个下界是“紧的”：这样学到的方差真正反映不确定性，而不只是一个附带的数。</p>
+
+  <h3>一个训练周期</h3>
+  <ol class="steps">
+    <li><div>用当前策略在环境里跑一个回合：1000 个环境步，动作重复 2 次，所以是 500 次决策。存入回放缓冲区。</div></li>
+    <li><div>做 250 次更新。每次从缓冲区随机取 32 段、每段 32 步的序列。</div></li>
+    <li><div>每次更新先训练世界模型（Adam，学习率 3×10<sup>−4</sup>），再用这批数据上的滤波均值训练 SAC 的 critic、actor 和熵系数。SAC 看到的滤波均值被截断梯度，不会改动世界模型。</div></li>
+    <li><div>重复 1000 个周期，共 100 万环境步。每 20 个周期评估一次（20 个回合取平均）。</div></li>
+  </ol>
+</section>
+
+<section id="acting">
+  <h2>怎么执行</h2>
+  <p>和环境交互时，未来还没发生，所以只用滤波、不用平滑，并且一步一步算：</p>
+  <ol class="steps">
+    <li><div>收到新观测 o<sub>t</sub>，编码得到 w<sub>t</sub>, Σ<sup>w</sup><sub>t</sub>。</div></li>
+    <li><div>用上一步存下的 m<sub>t−1</sub> 和动作 a<sub>t−1</sub> 算出 A, b, Σ，做一次“预测 + 更新”，得到 μ<sup>+</sup><sub>t</sub>。</div></li>
+    <li><div>actor 读 μ<sup>+</sup><sub>t</sub> 选出动作 a<sub>t</sub>（评估时取均值动作，不随机采样）。</div></li>
+    <li><div>Mamba 以“单步模式”读入 [w<sub>t</sub>, a<sub>t−1</sub>]，更新它固定大小的内部缓存，输出 m<sub>t</sub> 留给下一步。</div></li>
+  </ol>
+  <p>每步的计算量恒定，与回合已经进行了多久无关。</p>
+</section>
+
+<section id="compare">
+  <h2>与对照方法比较</h2>
+  <p>论文的主要对照是 RSSM（Dreamer 系列的世界模型）和 VRKN。三者都配同一个 SAC。下表的耗时是我们在 H100 上用论文设置（批大小 32）实测的，对应论文图 6。</p>
+</section>
+
+<div class="wide table-wrap">
+  <table>
+    <thead><tr><th>方法</th><th>推断用到的信息</th><th>平滑</th><th>时间并行</th><th style="text-align:right">前向 · 32 步</th><th style="text-align:right">前向 · 2048 步</th><th style="text-align:right">一次训练 · 2048 步</th></tr></thead>
+    <tbody>
+      <tr><td><b>RSSM</b></td><td>只用过去（滤波）</td><td>否</td><td>否</td><td class="num">0.021 s</td><td class="num">1.25 s</td><td class="num">5.65 s</td></tr>
+      <tr><td><b>VRKN</b></td><td>过去和未来（平滑）</td><td>是</td><td>否</td><td class="num">0.023 s</td><td class="num">1.37 s</td><td class="num">8.11 s</td></tr>
+      <tr><td><b class="c-obs">KalMamba</b></td><td>过去和未来（平滑）</td><td>是</td><td>是</td><td class="num">0.007 s</td><td class="num">0.028 s</td><td class="num">0.146 s</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<section>
+  <p>序列长到 2048 步时，KalMamba 的一次训练更新比 VRKN 快约 55 倍，比 RSSM 快约 39 倍。RSSM 不做平滑，因此它学到的不确定性不够可靠，这是论文认为它在噪声任务上吃亏的原因。</p>
+</section>
+
+<section id="repro">
+  <h2>复现注记</h2>
+  <div class="callout">
+    <p><b>直接取自论文的</b>：上面所有层数、宽度、隐状态 230 维、A 的取值范围 [0.4, 0.99]、Mamba 超参数、KL 平衡 0.5、自由比特 3、α = 1、学习率、SAC 设置、序列长度 32、噪声标准差 0.3。</p>
+    <p><b>论文没写、我们沿用 VRKN / CoRAL 代码或自行假设的</b>：动力学头的具体层（论文只写“VRKN 的动力学模型结构”）、梯度裁剪 10、批大小 32、每回合 250 次更新、正则项中滤波一侧不回传梯度、初始时刻 KL 权重为 0、噪声 0.3 按标准差理解。</p>
+    <p><b>与论文不一致的发现</b>：在状态输入的噪声任务上，按论文设置 α = 1 的正则项反而明显拖累了效果（它把滤波方差压得过小）。去掉正则项（论文消融里的 “No Regularization”）的版本最好，所以我们的主对比用它。种子 1 到 3 的实验还在跑，最终结论以多种子的置信区间为准。</p>
+  </div>
+</section>
+
+<footer>
+  代码：<span class="mono">~/kalmamba/ssm_rl/kalmamba/</span>（transition.py 是模型主体，parallel_kalman.py 是并行滤波与平滑，objective.py 是损失）。
+</footer>
+
+</main>
+
+<script>
+(function () {
+  const svg = document.getElementById('demo-svg');
+  const pv = document.getElementById('pv'), ov = document.getElementById('ov');
+  const W = 640, H = 190, x0 = -1.5, x1 = 2.5, base = 160, top = 14;
+  const sx = x => (x - x0) / (x1 - x0) * W;
+  const pdf = (x, m, v) => Math.exp(-((x - m) ** 2) / (2 * v)) / Math.sqrt(2 * Math.PI * v);
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text) e.textContent = text;
+    return e;
+  }
+  function curve(m, v, peak) {
+    let d = '';
+    for (let i = 0; i <= 200; i++) {
+      const x = x0 + (x1 - x0) * i / 200;
+      const y = base - pdf(x, m, v) / peak * (base - top);
+      d += (i ? 'L' : 'M') + sx(x).toFixed(1) + ',' + y.toFixed(1);
+    }
+    return d;
+  }
+  function render() {
+    const P = +pv.value, R = +ov.value;
+    const k = P / (P + R), m = k * 1, v = (1 - k) * P;
+    const peak = Math.max(pdf(0, 0, P), pdf(1, 1, R), pdf(m, m, v));
+    svg.replaceChildren();
+    svg.appendChild(el('line', { x1: 0, x2: W, y1: base, y2: base, stroke: 'var(--line)', 'stroke-width': 1 }));
+    for (const t of [-1, 0, 1, 2]) {
+      svg.appendChild(el('line', { x1: sx(t), x2: sx(t), y1: base, y2: base + 5, stroke: 'var(--muted)' }));
+      svg.appendChild(el('text', { x: sx(t), y: base + 19, 'text-anchor': 'middle', class: 't-note' }, String(t)));
+    }
+    const series = [
+      [0, P, 'var(--muted)', '预测', '6 4'],
+      [1, R, 'var(--obs)', '观测', ''],
+      [m, v, 'var(--kal)', '合并', '']
+    ];
+    for (const [mm, vv, color, label, dash] of series) {
+      svg.appendChild(el('path', { d: curve(mm, vv, peak), fill: 'none', stroke: color, 'stroke-width': label === '合并' ? 2.6 : 2, 'stroke-dasharray': dash }));
+      const yTop = base - pdf(mm, mm, vv) / peak * (base - top);
+      svg.appendChild(el('text', { x: sx(mm), y: Math.max(yTop - 6, 12), 'text-anchor': 'middle', class: 't-note', style: 'fill:' + color + ';font-weight:700' }, label));
+    }
+    document.getElementById('pv-out').textContent = P.toFixed(2);
+    document.getElementById('ov-out').textContent = R.toFixed(2);
+    document.getElementById('k-out').textContent = k.toFixed(2);
+    document.getElementById('pm-out').textContent = m.toFixed(2);
+    document.getElementById('pvv-out').textContent = v.toFixed(2);
+  }
+  pv.addEventListener('input', render);
+  ov.addEventListener('input', render);
+  render();
+})();
+</script>
